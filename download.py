@@ -1,0 +1,1 @@
+from ultralytics import SAM; SAM('sam3_l.pt')
