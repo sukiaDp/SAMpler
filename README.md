@@ -16,10 +16,8 @@
 
 ```bash
 conda activate yoloV8
-pip install gradio
+pip install -r requirements.txt
 ```
-
-依赖：`ultralytics`、`opencv-python`、`numpy`、`pyyaml`（均已在 conda 环境中安装）。
 
 ## 快速开始
 
