@@ -723,6 +723,52 @@ def run_yolo_inference(image_path: str, weights_path: str, conf: float, imgsz: i
     return vis_rgb, "\n".join(lines)
 
 
+def get_model_info(weights_path: str) -> str:
+    """读取 .pt 权重文件，返回模型版本和大小信息"""
+    if not weights_path or not Path(weights_path).exists():
+        return "（未找到权重文件）"
+    try:
+        import torch
+        ckpt = torch.load(weights_path, map_location="cpu", weights_only=False)
+        info_parts = []
+
+        # 从 checkpoint 中提取模型名 / 架构信息
+        model_name = None
+        if isinstance(ckpt, dict):
+            # ultralytics 保存格式通常有 'model' 键
+            model_obj = ckpt.get("model", None)
+            if model_obj is not None and hasattr(model_obj, "yaml"):
+                yaml_cfg = model_obj.yaml
+                if isinstance(yaml_cfg, dict):
+                    scale = yaml_cfg.get("scale", "")
+                    yaml_file = yaml_cfg.get("yaml_file", "")
+                    if yaml_file:
+                        info_parts.append(f"架构: {Path(yaml_file).stem}")
+                    elif scale:
+                        info_parts.append(f"规格: {scale}")
+
+            # 训练参数中可能有 model 名
+            train_args = ckpt.get("train_args", {})
+            if isinstance(train_args, dict) and "model" in train_args:
+                model_name = train_args["model"]
+                info_parts.insert(0, f"模型: {model_name}")
+
+            # task 信息
+            task = None
+            if isinstance(train_args, dict):
+                task = train_args.get("task", None)
+            if task:
+                info_parts.append(f"任务: {task}")
+
+        # 文件大小
+        size_mb = Path(weights_path).stat().st_size / (1024 * 1024)
+        info_parts.append(f"文件大小: {size_mb:.1f} MB")
+
+        return "\n".join(info_parts) if info_parts else "（无法解析模型信息）"
+    except Exception as e:
+        return f"（读取失败: {e}）"
+
+
 def browse_weights(current: str) -> str:
     """打开文件选择对话框选择权重文件"""
     import tkinter as tk
@@ -975,6 +1021,9 @@ def create_ui():
                                 "浏览...", scale=1, min_width=60,
                                 elem_classes="compact-btn",
                             )
+                        infer_model_info = gr.Textbox(
+                            label="模型信息", lines=3, interactive=False,
+                        )
                         with gr.Row():
                             infer_conf = gr.Slider(
                                 minimum=0.05, maximum=0.95, value=0.25,
@@ -995,6 +1044,15 @@ def create_ui():
                     fn=browse_weights,
                     inputs=[infer_weights],
                     outputs=[infer_weights],
+                ).then(
+                    fn=get_model_info,
+                    inputs=[infer_weights],
+                    outputs=[infer_model_info],
+                )
+                infer_weights.change(
+                    fn=get_model_info,
+                    inputs=[infer_weights],
+                    outputs=[infer_model_info],
                 )
                 infer_btn.click(
                     fn=run_yolo_inference,

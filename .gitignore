@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Model weights
+*.pt
+
+# YOLO runs
+runs/
+
+# Dataset outputs
+dataset/
+datas/
+
+# Result images
+result_*.jpg
+test_image.jpg
+
+# Misc
+*.png
