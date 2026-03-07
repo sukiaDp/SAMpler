@@ -8,6 +8,7 @@ SAM3 自动标注 + YOLO 训练 Gradio 应用
 4. 单图预览：拖入单张图片，绘制 SAM3 分割结果
 """
 
+import os
 import random
 import shutil
 import sys
@@ -15,6 +16,9 @@ import threading
 import time
 from collections import Counter
 from pathlib import Path
+
+# 修复 CUBLAS 确定性行为警告
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 import cv2
 import gradio as gr
@@ -676,10 +680,77 @@ def run_single_image_segmentation(
     return cv2.cvtColor(vis, cv2.COLOR_BGR2RGB), info
 
 
+# ── YOLO 推理 ────────────────────────────────────────────────────────────────
+
+def run_yolo_inference(image_path: str, weights_path: str, conf: float, imgsz: int):
+    """使用训练好的 YOLO 模型对单张图片进行推理"""
+    if image_path is None:
+        raise gr.Error("请先上传一张图片")
+    if not weights_path or not Path(weights_path).exists():
+        raise gr.Error(f"权重文件不存在: {weights_path}")
+
+    from ultralytics import YOLO
+    model = YOLO(weights_path)
+    results = model.predict(
+        source=image_path,
+        conf=conf,
+        imgsz=int(imgsz),
+        verbose=False,
+    )
+
+    if not results:
+        img = cv2.imread(image_path)
+        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB), "未检测到任何目标"
+
+    result = results[0]
+    vis = result.plot()  # ultralytics 内置可视化，返回 BGR numpy
+    vis_rgb = cv2.cvtColor(vis, cv2.COLOR_BGR2RGB)
+
+    # 构建统计信息
+    names = result.names or {}
+    lines = []
+    if result.boxes is not None and len(result.boxes):
+        cls_ids = result.boxes.cls.cpu().numpy().astype(int)
+        counts = Counter(cls_ids)
+        total = sum(counts.values())
+        lines.append(f"检测到 {total} 个目标")
+        for cid, cnt in sorted(counts.items()):
+            label = names.get(cid, str(cid))
+            lines.append(f"  {label}: {cnt}")
+    else:
+        lines.append("未检测到任何目标")
+
+    return vis_rgb, "\n".join(lines)
+
+
+def browse_weights(current: str) -> str:
+    """打开文件选择对话框选择权重文件"""
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    selected = filedialog.askopenfilename(
+        title="选择 YOLO 权重文件",
+        initialdir=str(Path(current).parent) if current and Path(current).parent.is_dir() else ".",
+        filetypes=[("PyTorch 权重", "*.pt"), ("所有文件", "*.*")],
+    )
+    root.destroy()
+    return selected if selected else current
+
+
 # ── Gradio 界面 ──────────────────────────────────────────────────────────────
 
 def create_ui():
-    with gr.Blocks(title="SAM3 自动标注 + YOLO 训练", theme=gr.themes.Soft()) as app:
+    with gr.Blocks(
+        title="SAM3 自动标注 + YOLO 训练",
+        theme=gr.themes.Soft(),
+        css="""
+            .compact-btn { min-width: 80px !important; }
+            .page-indicator input { text-align: center !important; }
+        """,
+    ) as app:
         gr.Markdown("# SAM3 自动标注 + YOLO 训练")
 
         with gr.Tabs():
@@ -690,22 +761,39 @@ def create_ui():
 
                 current_idx = gr.State(0)
 
-                # ── 阶段一 ──
-                gr.Markdown("## 阶段一：自动标注")
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        with gr.Row():
-                            img_dir = gr.Textbox(label="图片目录路径", value="rawData", scale=4)
-                            img_browse = gr.Button("浏览...", scale=1, min_width=70)
-                        prompts = gr.Textbox(
-                            label="文本提示词（逗号分隔）",
-                            placeholder="tree,person,bush",
-                        )
-                        mode = gr.Radio(
-                            choices=["detect", "segment"],
-                            value="detect",
-                            label="标注模式",
-                        )
+                # ── 标注设置（可折叠） ──
+                with gr.Accordion("标注设置", open=True):
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            with gr.Row():
+                                img_dir = gr.Textbox(
+                                    label="图片目录", value="rawData", scale=5,
+                                )
+                                img_browse = gr.Button(
+                                    "浏览...", scale=1, min_width=60,
+                                    elem_classes="compact-btn",
+                                )
+                                out_dir = gr.Textbox(
+                                    label="输出目录", value="dataset/", scale=5,
+                                )
+                                out_browse = gr.Button(
+                                    "浏览...", scale=1, min_width=60,
+                                    elem_classes="compact-btn",
+                                )
+                            prompts = gr.Textbox(
+                                label="文本提示词（逗号分隔）",
+                                placeholder="tree,person,bush",
+                            )
+                        with gr.Column(scale=1):
+                            mode = gr.Radio(
+                                choices=["detect", "segment"],
+                                value="detect", label="标注模式",
+                            )
+                            sort_mode = gr.Radio(
+                                choices=["置信度", "框面积"],
+                                value="置信度", label="超出时保留依据",
+                            )
+                    with gr.Row():
                         conf_slider = gr.Slider(
                             minimum=0.05, maximum=0.95, value=0.25, step=0.05,
                             label="置信度阈值",
@@ -714,88 +802,78 @@ def create_ui():
                             minimum=0.05, maximum=0.5, value=0.2, step=0.05,
                             label="验证集比例",
                         )
-                        with gr.Row():
-                            max_inst = gr.Number(label="每张图最大标注数", value=7, precision=0)
-                            sort_mode = gr.Radio(
-                                choices=["置信度", "框面积"],
-                                value="置信度",
-                                label="超出时保留依据",
-                            )
-                        with gr.Row():
-                            out_dir = gr.Textbox(label="输出目录", value="dataset/", scale=4)
-                            out_browse = gr.Button("浏览...", scale=1, min_width=70)
-                        annotate_btn = gr.Button("开始标注", variant="primary")
-
-                    with gr.Column(scale=1):
-                        stats_box = gr.Textbox(
-                            label="标注统计", lines=12, interactive=False
+                        max_inst = gr.Number(
+                            label="每张图最大标注数", value=7, precision=0,
+                        )
+                        annotate_btn = gr.Button(
+                            "开始标注", variant="primary", min_width=120,
                         )
 
-                # ── 阶段二 ──
-                gr.Markdown("## 阶段二：标注预览")
-                with gr.Row():
-                    prev_btn = gr.Button("上一张")
-                    page_label = gr.Textbox(
-                        value="0 / 0", label="当前图片", interactive=False,
-                        scale=1, min_width=120,
+                    stats_box = gr.Textbox(
+                        label="标注统计", lines=4, interactive=False,
                     )
-                    next_btn = gr.Button("下一张")
-                    delete_btn = gr.Button("删除此张", variant="stop")
+
+                # ── 标注预览（主体区域） ──
+                gr.Markdown("---")
+                with gr.Row(equal_height=False):
+                    prev_btn = gr.Button("◀ 上一张", elem_classes="compact-btn")
+                    page_label = gr.Textbox(
+                        value="0 / 0", label="", show_label=False,
+                        interactive=False, scale=0, min_width=100,
+                        elem_classes="page-indicator",
+                    )
+                    next_btn = gr.Button("下一张 ▶", elem_classes="compact-btn")
+                    delete_btn = gr.Button(
+                        "删除此张", variant="stop", elem_classes="compact-btn",
+                    )
+                    delete_msg = gr.Textbox(
+                        label="", show_label=False, interactive=False,
+                        scale=3, placeholder="操作提示",
+                    )
 
                 with gr.Row():
-                    with gr.Column(scale=3):
-                        preview_image = gr.Image(label="标注预览", height=600)
-                    with gr.Column(scale=1):
+                    preview_image = gr.Image(label="标注预览", height=560, scale=3)
+                    with gr.Column(scale=1, min_width=240):
                         contour_html = gr.HTML(
                             value="<p style='color:#888'>当前图片无标注</p>",
-                            label="标注实例列表",
                         )
                         contour_select = gr.CheckboxGroup(
                             choices=[], value=[], label="选择要删除的标注",
                         )
-                        delete_contour_btn = gr.Button("删除选中标注", variant="stop")
+                        delete_contour_btn = gr.Button(
+                            "删除选中标注", variant="stop", size="sm",
+                        )
 
-                delete_msg = gr.Textbox(label="操作提示", interactive=False)
-
-                # ── 阶段三 ──
-                gr.Markdown("## 阶段三：一键训练")
-                with gr.Row():
-                    with gr.Column(scale=1):
+                # ── 训练设置（可折叠，默认收起） ──
+                with gr.Accordion("训练设置", open=False):
+                    with gr.Row():
                         yolo_version = gr.Dropdown(
                             choices=["YOLOv8", "YOLOv11", "YOLO26"],
-                            value="YOLOv8",
-                            label="YOLO 版本",
+                            value="YOLOv8", label="YOLO 版本",
                         )
                         model_size = gr.Dropdown(
                             choices=["n", "s", "m", "l", "x"],
-                            value="n",
-                            label="模型规格",
+                            value="n", label="模型规格",
                         )
                         task_display = gr.Textbox(
-                            label="任务类型（跟随标注模式）",
-                            value="detect",
+                            label="任务类型", value="detect",
                             interactive=False,
                         )
-                        epochs = gr.Number(label="训练轮数 (epochs)", value=100)
-                        imgsz = gr.Number(label="图片尺寸 (imgsz)", value=640)
-                        train_btn = gr.Button("开始训练", variant="primary")
-
-                    with gr.Column(scale=2):
-                        train_log = gr.Textbox(
-                            label="训练日志",
-                            lines=25,
-                            max_lines=50,
-                            interactive=False,
-                            autoscroll=True,
+                        epochs = gr.Number(label="Epochs", value=100)
+                        imgsz = gr.Number(label="ImgSz", value=640)
+                        train_btn = gr.Button(
+                            "开始训练", variant="primary", min_width=120,
                         )
+                    train_log = gr.Textbox(
+                        label="训练日志", lines=20, max_lines=40,
+                        interactive=False, autoscroll=True,
+                    )
 
                 # ── 事件绑定 ──
 
-                # 浏览文件夹
                 img_browse.click(fn=browse_folder, inputs=[img_dir], outputs=[img_dir])
                 out_browse.click(fn=browse_folder, inputs=[out_dir], outputs=[out_dir])
 
-                # 标注
                 annotate_btn.click(
                     fn=run_annotation,
                     inputs=[img_dir, prompts, mode, conf_slider, val_slider,
@@ -804,42 +882,32 @@ def create_ui():
                              contour_html, contour_select],
                 )
 
-                # 标注模式 → 任务类型
                 mode.change(fn=lambda m: m, inputs=[mode], outputs=[task_display])
 
-                # 上一张
                 prev_btn.click(
                     fn=lambda idx: navigate_preview(idx, -1),
                     inputs=[current_idx],
                     outputs=[preview_image, page_label, current_idx,
                              contour_html, contour_select],
                 )
-
-                # 下一张
                 next_btn.click(
                     fn=lambda idx: navigate_preview(idx, 1),
                     inputs=[current_idx],
                     outputs=[preview_image, page_label, current_idx,
                              contour_html, contour_select],
                 )
-
-                # 删除整张图
                 delete_btn.click(
                     fn=delete_current,
                     inputs=[current_idx],
                     outputs=[preview_image, page_label, current_idx, delete_msg,
                              contour_html, contour_select],
                 )
-
-                # 删除选中轮廓
                 delete_contour_btn.click(
                     fn=delete_selected_contours,
                     inputs=[current_idx, contour_select],
                     outputs=[preview_image, delete_msg,
                              contour_html, contour_select],
                 )
-
-                # 训练
                 train_btn.click(
                     fn=run_training_async,
                     inputs=[yolo_version, model_size, epochs, imgsz],
@@ -849,35 +917,35 @@ def create_ui():
             # ══════════════════════════════════════════════════════════
             #  标签页二：单图分割预览
             # ══════════════════════════════════════════════════════════
-            with gr.TabItem("单图分割预览"):
-                gr.Markdown("## 拖入图片，查看 SAM3 分割结果")
+            with gr.TabItem("单图测试"):
 
                 with gr.Row():
-                    with gr.Column(scale=1):
+                    with gr.Column(scale=1, min_width=280):
                         single_image = gr.Image(
-                            label="上传图片", type="filepath", height=300,
+                            label="上传图片", type="filepath", height=240,
                         )
                         single_prompts = gr.Textbox(
                             label="文本提示词（逗号分隔）",
                             placeholder="tree,person,bush",
                         )
-                        single_conf = gr.Slider(
-                            minimum=0.05, maximum=0.95, value=0.25, step=0.05,
-                            label="置信度阈值",
-                        )
                         with gr.Row():
-                            single_max_inst = gr.Number(label="最大标注数", value=7, precision=0)
-                            single_sort = gr.Radio(
-                                choices=["置信度", "框面积"],
-                                value="置信度",
-                                label="超出时保留依据",
+                            single_conf = gr.Slider(
+                                minimum=0.05, maximum=0.95, value=0.25,
+                                step=0.05, label="置信度",
                             )
+                            single_max_inst = gr.Number(
+                                label="最大标注数", value=7, precision=0,
+                            )
+                        single_sort = gr.Radio(
+                            choices=["置信度", "框面积"],
+                            value="置信度", label="超出时保留依据",
+                        )
                         single_btn = gr.Button("开始分割", variant="primary")
                         single_info = gr.Textbox(
-                            label="检测结果", lines=5, interactive=False,
+                            label="检测结果", lines=4, interactive=False,
                         )
 
-                    with gr.Column(scale=2):
+                    with gr.Column(scale=3):
                         single_result = gr.Image(label="分割结果", height=600)
 
                 single_btn.click(
@@ -885,6 +953,53 @@ def create_ui():
                     inputs=[single_image, single_prompts, single_conf,
                             single_max_inst, single_sort],
                     outputs=[single_result, single_info],
+                )
+
+            # ══════════════════════════════════════════════════════════
+            #  标签页三：YOLO 推理
+            # ══════════════════════════════════════════════════════════
+            with gr.TabItem("YOLO 推理"):
+
+                with gr.Row():
+                    with gr.Column(scale=1, min_width=280):
+                        infer_image = gr.Image(
+                            label="上传图片", type="filepath", height=240,
+                        )
+                        with gr.Row():
+                            infer_weights = gr.Textbox(
+                                label="权重文件路径",
+                                value="runs/detect/train/weights/best.pt",
+                                scale=5,
+                            )
+                            infer_browse = gr.Button(
+                                "浏览...", scale=1, min_width=60,
+                                elem_classes="compact-btn",
+                            )
+                        with gr.Row():
+                            infer_conf = gr.Slider(
+                                minimum=0.05, maximum=0.95, value=0.25,
+                                step=0.05, label="置信度",
+                            )
+                            infer_imgsz = gr.Number(
+                                label="ImgSz", value=640, precision=0,
+                            )
+                        infer_btn = gr.Button("开始推理", variant="primary")
+                        infer_info = gr.Textbox(
+                            label="检测结果", lines=4, interactive=False,
+                        )
+
+                    with gr.Column(scale=3):
+                        infer_result = gr.Image(label="推理结果", height=600)
+
+                infer_browse.click(
+                    fn=browse_weights,
+                    inputs=[infer_weights],
+                    outputs=[infer_weights],
+                )
+                infer_btn.click(
+                    fn=run_yolo_inference,
+                    inputs=[infer_image, infer_weights, infer_conf, infer_imgsz],
+                    outputs=[infer_result, infer_info],
                 )
 
     return app
