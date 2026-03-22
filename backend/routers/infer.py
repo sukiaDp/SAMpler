@@ -11,11 +11,20 @@ from backend.models import InferResponse, ModelInfoResponse
 router = APIRouter(tags=["infer"])
 
 PREVIEW_CACHE = Path(__file__).parent.parent.parent / ".cache" / "previews"
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+
+def _resolve_weights(weights_path: str) -> Path:
+    """Resolve weights path: absolute as-is, relative to project root."""
+    p = Path(weights_path)
+    if p.is_absolute():
+        return p
+    return PROJECT_ROOT / p
 
 
 @router.get("/api/model-info", response_model=ModelInfoResponse)
 def model_info(weights_path: str = Query(...)):
-    p = Path(weights_path)
+    p = _resolve_weights(weights_path)
     size_mb = p.stat().st_size / (1024 * 1024) if p.exists() else 0.0
     parts = []
     model_name = arch = task = None
@@ -61,7 +70,8 @@ async def run_infer(
     conf: float = Form(0.25),
     imgsz: int = Form(640),
 ):
-    if not Path(weights_path).exists():
+    resolved = _resolve_weights(weights_path)
+    if not resolved.exists():
         raise HTTPException(status_code=400, detail=f"权重文件不存在: {weights_path}")
 
     # Save upload to temp file
@@ -74,7 +84,7 @@ async def run_infer(
         from ultralytics import YOLO
         from collections import Counter
 
-        model = YOLO(weights_path)
+        model = YOLO(str(resolved))
         results = model.predict(
             source=tmp_path, conf=conf, imgsz=int(imgsz), verbose=False
         )
