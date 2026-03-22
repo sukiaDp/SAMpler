@@ -3,3 +3,7 @@ opencv-python
 numpy
 pyyaml
 gradio
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pytest>=8.0.0
+httpx>=0.27.0
