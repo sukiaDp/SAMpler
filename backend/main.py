@@ -1,12 +1,31 @@
+import logging
 import os
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+
+logger = logging.getLogger("sampler")
 
 app = FastAPI(title="SAMpler")
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logger.error("[%s %s] %s %s", request.method, request.url.path,
+                 exc.status_code, exc.detail)
+    return JSONResponse(status_code=exc.status_code,
+                        content={"detail": exc.detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error("[%s %s] 422 Validation error: %s", request.method,
+                 request.url.path, exc.errors())
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 from backend.routers import (
     images as images_router,
