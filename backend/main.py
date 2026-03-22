@@ -8,6 +8,9 @@ from fastapi.responses import FileResponse
 
 app = FastAPI(title="SAMpler")
 
+from backend.routers import images as images_router
+app.include_router(images_router.router)
+
 # Preview cache dir
 PREVIEW_DIR = Path(__file__).parent.parent / ".cache" / "previews"
 PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
