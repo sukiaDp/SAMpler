@@ -97,10 +97,19 @@ def _run_training(task_id: str, req: TrainRequest):
         class LogCapture:
             def __init__(self, orig):
                 self.orig = orig
+                self._line = ""
             def write(self, text):
                 self.orig.write(text)
-                if text.strip():
-                    log(text)
+                for ch in text:
+                    if ch == "\r":
+                        self._line = ""        # carriage return: discard partial line
+                    elif ch == "\n":
+                        stripped = self._line.strip()
+                        if stripped:
+                            log(stripped)
+                        self._line = ""        # newline: commit and reset
+                    else:
+                        self._line += ch
             def flush(self):
                 self.orig.flush()
 
