@@ -103,12 +103,20 @@ async function startTraining() {
       toast("训练完成！");
     });
 
-    eventSource.addEventListener("error", (e) => {
+    // "train_error" is our custom SSE event (avoids conflict with EventSource's
+    // built-in "error" event which fires on transient connection issues)
+    eventSource.addEventListener("train_error", (e) => {
       eventSource.close();
       btn.disabled = false;
       btn.textContent = "开始训练";
       toast(e.data || "训练失败", "error");
     });
+
+    // Built-in connection error — just log, EventSource auto-reconnects
+    eventSource.onerror = () => {
+      logEl.textContent += "(连接中断，正在重连...)\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    };
 
     // Poll progress for progress bar
     const poll = setInterval(async () => {

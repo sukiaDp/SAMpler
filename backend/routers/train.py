@@ -37,11 +37,14 @@ def stream_logs(task_id: str):
 
     def generate():
         last = 0
+        idle_ticks = 0  # ticks since last data sent
         while True:
             with _log_lock:
                 buf = _log_buffers.get(task_id, [])
                 new_lines = buf[last:]
                 last += len(new_lines)
+            if new_lines:
+                idle_ticks = 0
             for line in new_lines:
                 yield f"data: {line}\n\n"
 
@@ -53,10 +56,16 @@ def stream_logs(task_id: str):
                     for line in buf[last:]:
                         yield f"data: {line}\n\n"
                 if t.status == "error":
-                    yield f"event: error\ndata: {t.message}\n\n"
+                    yield f"event: train_error\ndata: {t.message}\n\n"
                 else:
                     yield "event: done\ndata: 训练完成\n\n"
                 break
+
+            # Send a comment-line heartbeat every ~5 s to keep connection alive
+            idle_ticks += 1
+            if idle_ticks >= 10:
+                yield ": heartbeat\n\n"
+                idle_ticks = 0
             time.sleep(0.5)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
