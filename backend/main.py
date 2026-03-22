@@ -9,9 +9,9 @@ from fastapi.responses import FileResponse
 app = FastAPI(title="SAMpler")
 
 # Preview cache dir
-PREVIEW_DIR = Path(".cache/previews")
+PREVIEW_DIR = Path(__file__).parent.parent / ".cache" / "previews"
 PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/previews", StaticFiles(directory=str(PREVIEW_DIR)), name="previews")
+app.mount("/previews", StaticFiles(directory=str(PREVIEW_DIR), check_dir=False), name="previews")
 
 # Frontend static files (registered last so API routes take priority)
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
