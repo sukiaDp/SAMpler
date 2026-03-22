@@ -15,7 +15,6 @@
 ## 环境准备
 
 ```bash
-conda activate yoloV8
 pip install -r requirements.txt
 ```
 
