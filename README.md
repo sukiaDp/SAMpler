@@ -15,7 +15,12 @@
 
 ## 环境准备
 
+建议先安装好匹配 CUDA 版本的 PyTorch，再安装其余依赖：
+
 ```bash
+# 示例：CUDA 12.1
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
 pip install -r requirements.txt
 ```
 
@@ -25,11 +30,16 @@ pip install -r requirements.txt
 # 1. 下载 SAM3 模型权重（约 3.5GB，首次需要）
 python download.py
 
+# 如果下载失败，也可以从 HuggingFace 手动下载后放到项目根目录：
+# https://huggingface.co/facebook/sam3/resolve/main/sam3.pt?download=true
+
 # 2. 启动服务
 python run.py
 
 # 3. 浏览器打开 http://localhost:8000
 ```
+
+> **注意**：YOLO 模型权重（如 `yolo11n.pt`）由 ultralytics 在首次训练或推理时自动下载，无需手动准备。
 
 ## 使用流程
 
