@@ -9,6 +9,8 @@ let state = {
 
 // id → preview API response, cleared when imagesDir changes or annotation deleted
 const previewCache = new Map();
+// ids whose server-side preview was just mutated — need one-time cache-bust
+const dirtyImages = new Set();
 
 async function fetchPreview(imageId) {
   if (previewCache.has(imageId)) return previewCache.get(imageId);
@@ -16,6 +18,8 @@ async function fetchPreview(imageId) {
     `/api/images/${imageId}/preview?images_dir=${encodeURIComponent(state.imagesDir)}`
   );
   previewCache.set(imageId, data);
+  // preload pixel data into browser image cache so renders are instant
+  new Image().src = data.preview_url;
   return data;
 }
 
@@ -76,6 +80,7 @@ async function loadDir() {
   try {
     const data = await api(`/api/images?dir=${encodeURIComponent(dir)}`);
     previewCache.clear();
+    dirtyImages.clear();
     state.files = data.files;
     state.idx = 0;
     state.imagesDir = dir;
@@ -105,7 +110,10 @@ async function showCurrent(dir = 0) {
     const data = await fetchPreview(f.id);
     const wrap = document.getElementById("prev-img-wrap");
     const animClass = dir > 0 ? "slide-from-right" : dir < 0 ? "slide-from-left" : "";
-    wrap.innerHTML = `<img src="${data.preview_url}?t=${Date.now()}" alt="${f.filename}"
+    // only bust cache when the image was just mutated server-side
+    const bust = dirtyImages.has(f.id) ? `?t=${Date.now()}` : "";
+    dirtyImages.delete(f.id);
+    wrap.innerHTML = `<img src="${data.preview_url}${bust}" alt="${f.filename}"
                            class="${animClass}" />`;
     renderTags(data.annotations);
     preloadAround(state.idx);
@@ -189,6 +197,7 @@ async function deleteSelectedAnns() {
     toast(`已删除 ${ids.length} 个标注`);
     state.selectedAnns = new Set();
     previewCache.delete(f.id);  // force re-fetch after annotation change
+    dirtyImages.add(f.id);      // bust browser image cache once
     await showCurrent();
   } catch {}
 }
