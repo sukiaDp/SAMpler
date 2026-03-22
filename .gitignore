@@ -17,5 +17,8 @@ datas/
 result_*.jpg
 test_image.jpg
 
+# Preview cache
+.cache/
+
 # Misc
 *.png

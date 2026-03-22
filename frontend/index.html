@@ -1,2 +1,31 @@
 <!DOCTYPE html>
-<html><body><h1>SAMpler loading...</h1></body></html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAMpler</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header id="topbar">
+    <span class="logo">SAMpler</span>
+    <span class="page-title">自动标注</span>
+    <button id="theme-toggle">🌙</button>
+  </header>
+
+  <div id="layout">
+    <nav id="sidebar"></nav>
+
+    <main id="content">
+      <div id="view-annotate" class="view active"></div>
+      <div id="view-preview"  class="view"></div>
+      <div id="view-train"    class="view"></div>
+      <div id="view-infer"    class="view"></div>
+    </main>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
