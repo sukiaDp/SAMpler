@@ -7,6 +7,32 @@ let state = {
   selectedAnns: new Set(),
 };
 
+// id → preview API response, cleared when imagesDir changes or annotation deleted
+const previewCache = new Map();
+
+async function fetchPreview(imageId) {
+  if (previewCache.has(imageId)) return previewCache.get(imageId);
+  const data = await api(
+    `/api/images/${imageId}/preview?images_dir=${encodeURIComponent(state.imagesDir)}`
+  );
+  previewCache.set(imageId, data);
+  return data;
+}
+
+function preloadAround(centerIdx) {
+  const files = state.files;
+  for (let offset = -5; offset <= 5; offset++) {
+    if (offset === 0) continue;
+    const i = centerIdx + offset;
+    if (i < 0 || i >= files.length) continue;
+    const id = files[i].id;
+    if (!previewCache.has(id)) {
+      // fire-and-forget; errors silently ignored
+      fetchPreview(id).catch(() => {});
+    }
+  }
+}
+
 export function init() {
   const container = document.getElementById("view-preview");
   container.innerHTML = `
@@ -49,6 +75,7 @@ async function loadDir() {
   const dir = document.getElementById("prev-dir").value.trim();
   try {
     const data = await api(`/api/images?dir=${encodeURIComponent(dir)}`);
+    previewCache.clear();
     state.files = data.files;
     state.idx = 0;
     state.imagesDir = dir;
@@ -75,15 +102,12 @@ async function showCurrent() {
     `${state.idx + 1} / ${files.length}`;
 
   try {
-    const data = await api(
-      `/api/images/${f.id}/preview?images_dir=${encodeURIComponent(state.imagesDir)}`
-    );
-    // Image
+    const data = await fetchPreview(f.id);
     const wrap = document.getElementById("prev-img-wrap");
     wrap.innerHTML = `<img src="${data.preview_url}?t=${Date.now()}" alt="${f.filename}" />`;
-
-    // Annotation tags
     renderTags(data.annotations);
+    // kick off background preload after rendering current
+    preloadAround(state.idx);
   } catch {}
 }
 
@@ -163,6 +187,7 @@ async function deleteSelectedAnns() {
     }
     toast(`已删除 ${ids.length} 个标注`);
     state.selectedAnns = new Set();
+    previewCache.delete(f.id);  // force re-fetch after annotation change
     await showCurrent();
   } catch {}
 }
