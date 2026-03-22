@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Images ────────────────────────────────────────────────────────────────────
@@ -43,6 +43,8 @@ class TrainRequest(BaseModel):
 # ── Task ──────────────────────────────────────────────────────────────────────
 
 class TaskStatus(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     task_id: str
     status: Literal["pending", "running", "done", "error"]
     progress: int = 0

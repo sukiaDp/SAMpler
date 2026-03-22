@@ -19,9 +19,14 @@ class TaskRegistry:
 
     def get(self, task_id: str) -> Optional[TaskStatus]:
         with self._lock:
-            return self._tasks.get(task_id)
+            task = self._tasks.get(task_id)
+            return task.model_copy() if task is not None else None
 
     def update(self, task_id: str, **kwargs) -> None:
+        valid_fields = TaskStatus.model_fields
+        for k in kwargs:
+            if k not in valid_fields:
+                raise ValueError(f"Unknown TaskStatus field: {k!r}")
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
