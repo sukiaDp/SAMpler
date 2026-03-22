@@ -94,14 +94,87 @@ SAM3/
 | `DELETE` | `/api/images/{id}` | 删除图片及对应标注文件 |
 | `DELETE` | `/api/images/{id}/annotations/{ann_id}` | 删除单个标注实例，重写标注文件 |
 | `POST` | `/api/annotate` | 启动 SAM3 标注任务，返回 `task_id` |
-| `GET` | `/api/tasks/{task_id}` | 查询任务状态（`pending/running/done/error`）、进度、错误信息 |
+| `GET` | `/api/tasks/{task_id}` | 查询任务状态（`pending/running/done/error`）、进度、错误信息（轮询） |
 | `POST` | `/api/train` | 启动 YOLO 训练任务，返回 `task_id` |
-| `GET` | `/api/train/{task_id}/logs` | SSE 流，实时推送训练日志行 |
-| `POST` | `/api/infer` | 推理单张图片，返回结果图 URL + 检测统计 |
+| `GET` | `/api/train/{task_id}/logs` | SSE 流，实时推送训练日志文本（与轮询并行，用途不同） |
+| `POST` | `/api/infer` | 推理单张图片（`multipart/form-data` 上传），返回结果图 URL + 检测统计 |
 | `GET` | `/api/model-info` | 查询 .pt 文件版本/架构/大小信息 |
-| `POST` | `/api/segment` | 单图 SAM3 分割（测试用） |
+| `POST` | `/api/segment` | 单图 SAM3 分割（`multipart/form-data` 上传，测试用） |
 
-### 5.2 任务管理
+**任务轮询与 SSE 的关系**：`GET /api/tasks/{task_id}` 返回任务状态和进度（适用于标注和训练）；`GET /api/train/{task_id}/logs` 是独立的 SSE 长连接，只用于推送训练的文字日志行，两者是并行机制，由不同 handler 处理。
+
+### 5.2 请求/响应 Schema
+
+**`GET /api/images?dir=<path>`**
+
+Query: `dir` (string) — 图片目录路径
+
+Response:
+```json
+{
+  "files": [
+    {"id": "img_0042", "filename": "img_0042.jpg", "has_label": true}
+  ],
+  "total": 48
+}
+```
+`id` 为不含扩展名的文件名（如 `img_0042`），用于构造后续 URL。
+
+**`POST /api/annotate`**
+
+Request (JSON):
+```json
+{
+  "image_dir": "rawData",
+  "output_dir": "dataset",
+  "prompts": "person, car, dog",
+  "mode": "segment",
+  "sort_mode": "conf",
+  "conf": 0.25,
+  "val_ratio": 0.1,
+  "max_instances": 7
+}
+```
+`mode` 枚举：`"detect"` | `"segment"`
+
+Response: `{"task_id": "abc123"}`
+
+**`POST /api/train`**
+
+Request (JSON):
+```json
+{
+  "dataset_dir": "dataset",
+  "task": "segment",
+  "yolo_version": "yolo11",
+  "model_size": "n",
+  "epochs": 100,
+  "imgsz": 640
+}
+```
+`dataset_dir` 和 `task` 由前端从标注配置中显式传入，不依赖服务器全局状态。
+
+Response: `{"task_id": "def456"}`
+
+**`POST /api/infer`** (`multipart/form-data`)
+
+Fields: `image` (file), `weights_path` (string), `conf` (float), `imgsz` (int)
+
+Response:
+```json
+{
+  "result_url": "/previews/infer_result_abc.jpg",
+  "stats": {"total": 3, "classes": {"person": 2, "car": 1}}
+}
+```
+
+**`POST /api/segment`** (`multipart/form-data`)
+
+Fields: `image` (file), `prompts` (string), `conf` (float), `max_instances` (int), `sort_mode` (string)
+
+Response: 同 `GET /api/images/{id}/preview`
+
+### 5.3 任务管理
 
 标注和训练为长耗时操作，统一采用 **后台线程 + task_id 轮询** 模式：
 
@@ -113,13 +186,14 @@ GET  /api/tasks/abc123  →  {"status": "done", "result": {...}}
 
 `tasks.py` 维护一个内存字典 `{task_id: TaskState}`，线程安全（`threading.Lock`）。
 
-### 5.3 图片数据约定
+### 5.4 图片数据约定
 
-- 预览图保存到 `.cache/previews/`，API 返回相对 URL（如 `/previews/img_0042.jpg`）
-- 不在 JSON 中内嵌 base64，前端用 `<img src="...">` 加载
+- 预览图保存到 `.cache/previews/`，FastAPI 用 `StaticFiles` 将 `/previews` 路由挂载到 `.cache/previews/` 目录，API 返回相对 URL（如 `/previews/img_0042.jpg`），前端直接用 `<img src="/previews/img_0042.jpg">` 加载
+- 不在 JSON 中内嵌 base64
 - 图片上传（推理/单图分割）使用 `multipart/form-data`
+- `/api/segment` 同样将结果图保存到 `.cache/previews/` 并返回 URL，格式同 preview 响应
 
-### 5.4 Canvas 预留接口
+### 5.5 Canvas 预留接口
 
 `GET /api/images/{id}/preview` 响应同时包含：
 
@@ -141,7 +215,7 @@ GET  /api/tasks/abc123  →  {"status": "done", "result": {...}}
 
 > **Canvas 升级注意**：当前前端使用 `preview_url` 展示后端渲染图。如需切换到前端 Canvas 绘制，使用 `annotations` 字段自行绘制，`preview_url` 可停用。接口无需改动。
 
-### 5.5 错误格式
+### 5.6 错误格式
 
 ```json
 {"error": "简短说明", "detail": "可选的详细信息"}
@@ -224,6 +298,7 @@ HTTP 状态码：`400` 参数错误，`404` 资源不存在，`500` 服务器内
 | 任务失败 | task status=error | 红色提示条 + 错误详情 |
 | GPU/推理异常 | 500 + error JSON | toast 提示 + 建议检查显存 |
 | 网络断开 | fetch 抛出异常 | toast 提示"无法连接服务器" |
+| 训练任务失败（SSE） | 推送特殊事件 `event: error\ndata: <原因>` 后关闭流 | 前端监听 `error` 事件类型，展示红色提示条 |
 
 ---
 
