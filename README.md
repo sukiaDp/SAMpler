@@ -15,12 +15,9 @@
 
 ## 环境准备
 
-建议先安装好匹配 CUDA 版本的 PyTorch，再安装其余依赖：
+建议先按照 [PyTorch 官网](https://pytorch.org/get-started/locally/) 的指引安装匹配 CUDA 版本的 PyTorch，再安装其余依赖：
 
 ```bash
-# 示例：CUDA 12.1
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-
 pip install -r requirements.txt
 ```
 
