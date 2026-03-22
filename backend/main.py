@@ -52,6 +52,27 @@ FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 def health():
     return {"status": "ok"}
 
+
+_PROJECT_ROOT = Path(__file__).parent.parent
+
+@app.get("/api/dirs")
+def list_dirs(path: str = ""):
+    """列出目录内容，用于前端文件浏览器。路径相对于项目根目录。"""
+    target = (_PROJECT_ROOT / path).resolve()
+    try:
+        target.relative_to(_PROJECT_ROOT.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="路径越界")
+    if not target.is_dir():
+        raise HTTPException(status_code=404, detail="目录不存在")
+    dirs  = sorted(e.name for e in target.iterdir()
+                   if e.is_dir() and not e.name.startswith("."))
+    files = sorted(e.name for e in target.iterdir()
+                   if e.is_file() and e.suffix == ".pt")
+    rel = target.relative_to(_PROJECT_ROOT.resolve())
+    return {"path": "" if str(rel) == "." else str(rel).replace("\\", "/"),
+            "dirs": dirs, "files": files}
+
 @app.get("/{full_path:path}")
 def serve_frontend(full_path: str):
     """Serve frontend SPA — all non-API paths return index.html"""

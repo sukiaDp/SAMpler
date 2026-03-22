@@ -1,4 +1,5 @@
 import { api, toast } from "../app.js";
+import { attachDirPicker } from "../dirpicker.js";
 
 export function init() {
   const container = document.getElementById("view-infer");
@@ -79,6 +80,7 @@ export function init() {
   });
 
   document.getElementById("infer-run-btn").addEventListener("click", runInference);
+  attachDirPicker("infer-weights", "file");
 }
 
 async function fetchModelInfo(path) {

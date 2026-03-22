@@ -1,4 +1,5 @@
 import { api, toast } from "../app.js";
+import { attachDirPicker } from "../dirpicker.js";
 
 let state = {
   files: [],
@@ -69,6 +70,7 @@ export function init() {
   `;
 
   document.getElementById("prev-load-btn").addEventListener("click", loadDir);
+  attachDirPicker("prev-dir");
   document.getElementById("prev-prev-btn").addEventListener("click", () => navigate(-1));
   document.getElementById("prev-next-btn").addEventListener("click", () => navigate(1));
   document.getElementById("prev-del-img-btn").addEventListener("click", deleteCurrentImage);

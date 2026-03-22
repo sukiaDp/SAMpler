@@ -1,4 +1,5 @@
 import { api, toast } from "../app.js";
+import { attachDirPicker } from "../dirpicker.js";
 
 let pollInterval = null;
 
@@ -67,6 +68,8 @@ export function init() {
   `;
 
   document.getElementById("ann-run-btn").addEventListener("click", startAnnotation);
+  attachDirPicker("ann-image-dir");
+  attachDirPicker("ann-output-dir");
 }
 
 async function startAnnotation() {

@@ -1,4 +1,5 @@
 import { api, toast } from "../app.js";
+import { attachDirPicker } from "../dirpicker.js";
 
 let eventSource = null;
 
@@ -106,6 +107,7 @@ export function init() {
   `;
 
   document.getElementById("tr-run-btn").addEventListener("click", startTraining);
+  attachDirPicker("tr-dataset-dir");
 }
 
 function updateMetrics(line) {
