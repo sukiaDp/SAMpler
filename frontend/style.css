@@ -273,6 +273,35 @@ input:focus, textarea:focus, select:focus {
   transition: width 0.3s;
 }
 
+/* ── Training metrics grid ── */
+.tr-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.tr-metric-item {
+  background: var(--bg-elevated);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-card);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tr-metric-label {
+  font-size: 10px;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.tr-metric-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Log output ── */
 .log-output {
   background: var(--bg);

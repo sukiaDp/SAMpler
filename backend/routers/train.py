@@ -1,7 +1,10 @@
+import re
 import sys
 import threading
 import time
 from pathlib import Path
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -104,9 +107,9 @@ def _run_training(task_id: str, req: TrainRequest):
                     if ch == "\r":
                         self._line = ""        # carriage return: discard partial line
                     elif ch == "\n":
-                        stripped = self._line.strip()
-                        if stripped:
-                            log(stripped)
+                        clean = _ANSI_RE.sub("", self._line).strip()
+                        if clean:
+                            log(clean)
                         self._line = ""        # newline: commit and reset
                     else:
                         self._line += ch

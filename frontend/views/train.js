@@ -2,6 +2,11 @@ import { api, toast } from "../app.js";
 
 let eventSource = null;
 
+// 正则：匹配 epoch 训练行，如 "  1/10   2.37G   2.409   3.352   2.079   110   640: 100%"
+const RE_TRAIN = /^\s*(\d+)\/(\d+)\s+([\d.]+G?)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+\d+\s+\d+:\s*100%/;
+// 正则：匹配 val 汇总行，如 "  all   100   450   0.512   0.489   0.501   0.278"
+const RE_VAL   = /^\s*all\s+\d+\s+\d+\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/;
+
 export function init() {
   const container = document.getElementById("view-train");
   container.innerHTML = `
@@ -56,11 +61,68 @@ export function init() {
       <div class="progress-bar">
         <div class="progress-bar-fill" id="tr-progress-fill" style="width:0%"></div>
       </div>
+
+      <div class="tr-metrics" id="tr-metrics" style="display:none">
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">Epoch</span>
+          <span class="tr-metric-value" id="trm-epoch">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">GPU</span>
+          <span class="tr-metric-value" id="trm-gpu">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">box_loss</span>
+          <span class="tr-metric-value" id="trm-box">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">cls_loss</span>
+          <span class="tr-metric-value" id="trm-cls">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">dfl_loss</span>
+          <span class="tr-metric-value" id="trm-dfl">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">Precision</span>
+          <span class="tr-metric-value" id="trm-p">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">Recall</span>
+          <span class="tr-metric-value" id="trm-r">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">mAP50</span>
+          <span class="tr-metric-value" id="trm-map50">—</span>
+        </div>
+        <div class="tr-metric-item">
+          <span class="tr-metric-label">mAP50-95</span>
+          <span class="tr-metric-value" id="trm-map">—</span>
+        </div>
+      </div>
+
       <div class="log-output" id="tr-log" style="margin-top:10px"></div>
     </div>
   `;
 
   document.getElementById("tr-run-btn").addEventListener("click", startTraining);
+}
+
+function updateMetrics(line) {
+  let m;
+  if ((m = RE_TRAIN.exec(line))) {
+    document.getElementById("tr-metrics").style.display = "grid";
+    document.getElementById("trm-epoch").textContent = `${m[1]} / ${m[2]}`;
+    document.getElementById("trm-gpu").textContent   = m[3];
+    document.getElementById("trm-box").textContent   = m[4];
+    document.getElementById("trm-cls").textContent   = m[5];
+    document.getElementById("trm-dfl").textContent   = m[6];
+  } else if ((m = RE_VAL.exec(line))) {
+    document.getElementById("trm-p").textContent     = m[1];
+    document.getElementById("trm-r").textContent     = m[2];
+    document.getElementById("trm-map50").textContent = m[3];
+    document.getElementById("trm-map").textContent   = m[4];
+  }
 }
 
 async function startTraining() {
@@ -80,6 +142,7 @@ async function startTraining() {
   btn.textContent = "训练中...";
   const logEl = document.getElementById("tr-log");
   logEl.textContent = "";
+  document.getElementById("tr-metrics").style.display = "none";
 
   try {
     const { task_id } = await api("/api/train", {
@@ -91,6 +154,7 @@ async function startTraining() {
     eventSource = new EventSource(`/api/train/${task_id}/logs`);
 
     eventSource.onmessage = (e) => {
+      updateMetrics(e.data);
       logEl.textContent += e.data + "\n";
       logEl.scrollTop = logEl.scrollHeight;
     };
