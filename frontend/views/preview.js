@@ -89,10 +89,10 @@ async function navigate(dir) {
   if (!state.files.length) return;
   state.idx = Math.max(0, Math.min(state.idx + dir, state.files.length - 1));
   state.selectedAnns = new Set();
-  await showCurrent();
+  await showCurrent(dir);
 }
 
-async function showCurrent() {
+async function showCurrent(dir = 0) {
   const files = state.files;
   if (!files.length) return;
   const f = files[state.idx];
@@ -104,9 +104,10 @@ async function showCurrent() {
   try {
     const data = await fetchPreview(f.id);
     const wrap = document.getElementById("prev-img-wrap");
-    wrap.innerHTML = `<img src="${data.preview_url}?t=${Date.now()}" alt="${f.filename}" />`;
+    const animClass = dir > 0 ? "slide-from-right" : dir < 0 ? "slide-from-left" : "";
+    wrap.innerHTML = `<img src="${data.preview_url}?t=${Date.now()}" alt="${f.filename}"
+                           class="${animClass}" />`;
     renderTags(data.annotations);
-    // kick off background preload after rendering current
     preloadAround(state.idx);
   } catch {}
 }
