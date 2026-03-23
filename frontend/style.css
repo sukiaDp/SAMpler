@@ -231,49 +231,90 @@ input:focus, textarea:focus, select:focus {
   color: var(--btn-danger-fg);
 }
 
-/* ── SAM status widget ── */
-@keyframes sam-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+/* ── SAM status card ── */
+@keyframes sam-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(200%); }
 }
-#sam-status-widget {
+
+#sam-status-card {
   position: fixed;
-  bottom: 14px;
-  left: 14px;
+  bottom: 16px;
+  right: 16px;
+  z-index: 200;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px 5px 8px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--separator);
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  color: var(--text-secondary);
+  border-radius: var(--radius-card);
+  min-width: 110px;
   text-decoration: none;
   cursor: default;
   user-select: none;
-  z-index: 200;
-  transition: border-color 0.2s, color 0.2s;
+  overflow: hidden;
+  transition: border-color 0.2s;
 }
-#sam-status-widget[data-clickable="true"] {
+#sam-status-card[data-clickable="true"] {
   cursor: pointer;
 }
-#sam-status-widget[data-clickable="true"]:hover {
-  border-color: var(--text-secondary);
+#sam-status-card[data-clickable="true"]:hover {
+  border-color: color-mix(in srgb, var(--text-secondary) 60%, transparent);
+}
+
+.sam-card-model {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+.sam-card-state {
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-primary);
+  transition: color 0.3s;
 }
-#sam-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--text-secondary);
+.sam-card-hint {
+  font-size: 10px;
+  color: var(--text-secondary);
+  min-height: 13px;
+  transition: opacity 0.2s;
 }
-#sam-status-widget[data-status="not_found"]  #sam-status-dot { background: #ff453a; }
-#sam-status-widget[data-status="idle"]       #sam-status-dot { background: var(--text-secondary); }
-#sam-status-widget[data-status="loading"]    #sam-status-dot { background: #ffd60a; animation: sam-pulse 1s ease-in-out infinite; }
-#sam-status-widget[data-status="ready"]      #sam-status-dot { background: #30d158; }
-#sam-status-widget[data-status="inferring"]  #sam-status-dot { background: #0a84ff; animation: sam-pulse 0.8s ease-in-out infinite; }
+
+/* Accent bar */
+.sam-card-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--separator);
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  transition: background 0.3s;
+}
+.sam-card-bar-fill {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  transition: background 0.3s;
+}
+
+/* State variants */
+#sam-status-card[data-status="not_found"] .sam-card-bar  { background: #ff453a; }
+#sam-status-card[data-status="not_found"] .sam-card-state { color: #ff453a; }
+
+#sam-status-card[data-status="ready"] .sam-card-bar { background: #30d158; }
+
+#sam-status-card[data-status="loading"] .sam-card-bar-fill {
+  background: #0a84ff;
+  animation: sam-sweep 1.1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+#sam-status-card[data-status="inferring"] .sam-card-bar-fill {
+  background: #0a84ff;
+  animation: sam-sweep 0.85s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
 
 /* ── Toast ── */
 #toast-container {

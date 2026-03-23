@@ -27,9 +27,11 @@
 
   <div id="toast-container"></div>
 
-  <a id="sam-status-widget" tabindex="0">
-    <span id="sam-status-dot"></span>
-    <span id="sam-status-label">检查中</span>
+  <a id="sam-status-card" tabindex="0" aria-label="SAM3 模型状态">
+    <span class="sam-card-model">SAM3</span>
+    <span class="sam-card-state" id="sam-status-label">检查中</span>
+    <span class="sam-card-hint" id="sam-status-hint"></span>
+    <div class="sam-card-bar"><div class="sam-card-bar-fill" id="sam-bar-fill"></div></div>
   </a>
 
   <script type="module" src="/app.js"></script>

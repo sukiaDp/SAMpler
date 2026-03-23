@@ -58,19 +58,21 @@ const SAM_STATUS_LABEL = {
 const SAM_DOWNLOAD_URL = "https://huggingface.co/1038lab/sam3";
 
 function initSamStatus() {
-  const widget = document.getElementById("sam-status-widget");
-  const label  = document.getElementById("sam-status-label");
+  const card  = document.getElementById("sam-status-card");
+  const label = document.getElementById("sam-status-label");
+  const hint  = document.getElementById("sam-status-hint");
 
   function update(status) {
-    widget.dataset.status = status;
+    card.dataset.status = status;
     label.textContent = SAM_STATUS_LABEL[status] ?? status;
     const clickable = status === "not_found";
-    widget.dataset.clickable = clickable;
-    widget.title = clickable ? "点击前往下载 sam3.pt" : `SAM3 模型状态：${SAM_STATUS_LABEL[status]}`;
+    card.dataset.clickable = clickable;
+    hint.textContent = clickable ? "点击下载 →" : "";
+    card.title = clickable ? "前往 HuggingFace 下载 sam3.pt" : "";
   }
 
-  widget.addEventListener("click", () => {
-    if (widget.dataset.clickable === "true") window.open(SAM_DOWNLOAD_URL, "_blank");
+  card.addEventListener("click", () => {
+    if (card.dataset.clickable === "true") window.open(SAM_DOWNLOAD_URL, "_blank");
   });
 
   async function poll() {
