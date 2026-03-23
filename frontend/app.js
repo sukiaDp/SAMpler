@@ -49,14 +49,14 @@ function toggleTheme() {
 // ── Router ────────────────────────────────────────────────────────────────────
 
 const VIEWS = {
+  sam:      { label: "标注测试", icon: "✂️" },
   annotate: { label: "自动标注", icon: "🏷" },
   preview:  { label: "预览编辑", icon: "🖼" },
   train:    { label: "YOLO 训练", icon: "⚡" },
   infer:    { label: "推理测试", icon: "🔍" },
-  sam:      { label: "SAM3 试用", icon: "✂️" },
 };
 
-let currentView = "annotate";
+let currentView = "sam";
 
 function navigate(view) {
   document.querySelectorAll(".nav-item").forEach(el => {
@@ -118,8 +118,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await maybeInit(view);
   };
 
-  await maybeInit("annotate");
-  navigate("annotate");
+  await maybeInit("sam");
+  navigate("sam");
 });
 
 export { api, toast };
