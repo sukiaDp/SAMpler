@@ -53,6 +53,7 @@ const VIEWS = {
   preview:  { label: "预览编辑", icon: "🖼" },
   train:    { label: "YOLO 训练", icon: "⚡" },
   infer:    { label: "推理测试", icon: "🔍" },
+  sam:      { label: "SAM3 试用", icon: "✂️" },
 };
 
 let currentView = "annotate";
@@ -98,6 +99,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     preview:  () => import("./views/preview.js"),
     train:    () => import("./views/train.js"),
     infer:    () => import("./views/infer.js"),
+    sam:      () => import("./views/sam.js"),
   };
   const initialized = new Set();
 
