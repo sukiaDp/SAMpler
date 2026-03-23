@@ -231,6 +231,50 @@ input:focus, textarea:focus, select:focus {
   color: var(--btn-danger-fg);
 }
 
+/* ── SAM status widget ── */
+@keyframes sam-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+#sam-status-widget {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: default;
+  user-select: none;
+  z-index: 200;
+  transition: border-color 0.2s, color 0.2s;
+}
+#sam-status-widget[data-clickable="true"] {
+  cursor: pointer;
+}
+#sam-status-widget[data-clickable="true"]:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+#sam-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-secondary);
+}
+#sam-status-widget[data-status="not_found"]  #sam-status-dot { background: #ff453a; }
+#sam-status-widget[data-status="idle"]       #sam-status-dot { background: var(--text-secondary); }
+#sam-status-widget[data-status="loading"]    #sam-status-dot { background: #ffd60a; animation: sam-pulse 1s ease-in-out infinite; }
+#sam-status-widget[data-status="ready"]      #sam-status-dot { background: #30d158; }
+#sam-status-widget[data-status="inferring"]  #sam-status-dot { background: #0a84ff; animation: sam-pulse 0.8s ease-in-out infinite; }
+
 /* ── Toast ── */
 #toast-container {
   position: fixed;

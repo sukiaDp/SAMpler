@@ -55,6 +55,12 @@ def health():
 
 _PROJECT_ROOT = Path(__file__).parent.parent
 
+@app.get("/api/sam/status")
+def sam_status():
+    from backend.segmentor import get_status
+    return {"status": get_status()}
+
+
 @app.get("/api/dirs")
 def list_dirs(path: str = ""):
     """列出目录内容，用于前端文件浏览器。路径相对于项目根目录。"""

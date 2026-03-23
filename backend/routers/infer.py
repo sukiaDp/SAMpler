@@ -130,7 +130,7 @@ async def run_segment(
         tmp_path = f.name
 
     try:
-        from backend.segmentor import get_segmentor
+        from backend.segmentor import get_segmentor, inferring
         from sam3 import draw_masks_on_image
         from backend.utils import generate_colors
         from collections import Counter
@@ -142,17 +142,18 @@ async def run_segment(
         segmentor = get_segmentor(conf)
         all_masks, all_boxes, all_confs, all_labels = [], [], [], []
 
-        for i, prompt in enumerate(names):
-            masks, boxes, confs = segmentor.predict(
-                tmp_path, prompt, force_reload=(i == 0)
-            )
-            if masks is None:
-                continue
-            for j in range(len(masks)):
-                all_masks.append(masks[j])
-                all_boxes.append(boxes[j])
-                all_confs.append(float(confs[j]))
-                all_labels.append(prompt)
+        with inferring():
+            for i, prompt in enumerate(names):
+                masks, boxes, confs = segmentor.predict(
+                    tmp_path, prompt, force_reload=(i == 0)
+                )
+                if masks is None:
+                    continue
+                for j in range(len(masks)):
+                    all_masks.append(masks[j])
+                    all_boxes.append(boxes[j])
+                    all_confs.append(float(confs[j]))
+                    all_labels.append(prompt)
 
         if len(all_masks) > max_instances:
             if sort_mode == "conf":

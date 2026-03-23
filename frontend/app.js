@@ -46,6 +46,44 @@ function toggleTheme() {
   document.getElementById("theme-toggle").textContent = next === "dark" ? "☀" : "🌙";
 }
 
+// ── SAM status widget ─────────────────────────────────────────────────────────
+
+const SAM_STATUS_LABEL = {
+  not_found: "未下载",
+  idle:      "未加载",
+  loading:   "加载中",
+  ready:     "就绪",
+  inferring: "推理中",
+};
+const SAM_DOWNLOAD_URL = "https://huggingface.co/1038lab/sam3";
+
+function initSamStatus() {
+  const widget = document.getElementById("sam-status-widget");
+  const label  = document.getElementById("sam-status-label");
+
+  function update(status) {
+    widget.dataset.status = status;
+    label.textContent = SAM_STATUS_LABEL[status] ?? status;
+    const clickable = status === "not_found";
+    widget.dataset.clickable = clickable;
+    widget.title = clickable ? "点击前往下载 sam3.pt" : `SAM3 模型状态：${SAM_STATUS_LABEL[status]}`;
+  }
+
+  widget.addEventListener("click", () => {
+    if (widget.dataset.clickable === "true") window.open(SAM_DOWNLOAD_URL, "_blank");
+  });
+
+  async function poll() {
+    try {
+      const res = await fetch("/api/sam/status");
+      if (res.ok) { const d = await res.json(); update(d.status); }
+    } catch {}
+  }
+
+  poll();
+  setInterval(poll, 3000);
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 const VIEWS = {
@@ -74,6 +112,7 @@ function navigate(view) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   initTheme();
+  initSamStatus();
 
   // Build sidebar
   const sidebar = document.getElementById("sidebar");

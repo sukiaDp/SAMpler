@@ -1,6 +1,7 @@
 """SAM3 lazy singleton — loaded once per process, reused across requests."""
 import threading
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 # Import from project root
@@ -11,15 +12,40 @@ _lock = threading.Lock()
 _segmentor: SAM3Segmentor | None = None
 _segmentor_conf: float | None = None
 
+# State: "not_found" | "idle" | "loading" | "ready" | "inferring"
+_state: str = "not_found"
+
+MODEL_PATH = Path(__file__).parent.parent / "sam3.pt"
+
+
+def get_status() -> str:
+    if not MODEL_PATH.exists():
+        return "not_found"
+    return _state
+
+
+@contextmanager
+def inferring():
+    """Context manager: marks the singleton as busy during inference."""
+    global _state
+    prev = _state
+    _state = "inferring"
+    try:
+        yield
+    finally:
+        _state = prev
+
 
 def get_segmentor(conf: float = 0.25) -> SAM3Segmentor:
-    global _segmentor, _segmentor_conf
+    global _segmentor, _segmentor_conf, _state
     with _lock:
         if _segmentor is None:
+            _state = "loading"
             _segmentor = SAM3Segmentor(
-                model_path="sam3.pt", conf=conf, device="0", half=True
+                model_path=str(MODEL_PATH), conf=conf, device="0", half=True
             )
             _segmentor_conf = conf
+            _state = "ready"
         elif conf != _segmentor_conf:
             _segmentor.predictor.args.conf = conf
             _segmentor_conf = conf
