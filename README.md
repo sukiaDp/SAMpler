@@ -27,8 +27,14 @@ pip install -r requirements.txt
 # 1. 下载 SAM3 模型权重（约 3.5GB，首次需要）
 python download.py
 
-# 如果下载失败，也可以从 HuggingFace 手动下载后放到项目根目录：
-# https://huggingface.co/facebook/sam3/resolve/main/sam3.pt?download=true
+# 如果下载失败，可以手动下载 sam3.pt 后放到项目根目录。
+# 有两个来源：
+#
+# 1. Meta 官方（需申请访问权限，审核通过后才能下载）：
+#    https://huggingface.co/facebook/sam3/resolve/main/sam3.pt?download=true
+#
+# 2. 第三方镜像（无需审核，直接下载）：
+#    https://huggingface.co/1038lab/sam3
 
 # 2. 启动服务
 python run.py
