@@ -21,6 +21,8 @@ MODEL_PATH = Path(__file__).parent.parent / "sam3.pt"
 def get_status() -> str:
     if not MODEL_PATH.exists():
         return "not_found"
+    if _segmentor is None:
+        return "idle"
     return _state
 
 
