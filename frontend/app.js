@@ -65,14 +65,24 @@ function initSamStatus() {
   function update(status) {
     card.dataset.status = status;
     label.textContent = SAM_STATUS_LABEL[status] ?? status;
-    const clickable = status === "not_found";
+    const clickable = status === "not_found" || status === "idle";
     card.dataset.clickable = clickable;
-    hint.textContent = clickable ? "点击下载 →" : "";
-    card.title = clickable ? "前往 HuggingFace 下载 sam3.pt" : "";
+    if (status === "not_found") hint.textContent = "点击下载 →";
+    else if (status === "idle") hint.textContent = "点击加载 →";
+    else hint.textContent = "";
+    card.title = status === "not_found" ? "前往 HuggingFace 下载 sam3.pt"
+               : status === "idle"      ? "点击预加载 SAM3 模型"
+               : "";
   }
 
-  card.addEventListener("click", () => {
-    if (card.dataset.clickable === "true") window.open(SAM_DOWNLOAD_URL, "_blank");
+  card.addEventListener("click", async () => {
+    if (card.dataset.status === "not_found") {
+      window.open(SAM_DOWNLOAD_URL, "_blank");
+    } else if (card.dataset.status === "idle") {
+      card.dataset.clickable = "false";
+      hint.textContent = "";
+      await fetch("/api/sam/load", { method: "POST" });
+    }
   });
 
   async function poll() {

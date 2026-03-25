@@ -61,6 +61,17 @@ def sam_status():
     return {"status": get_status()}
 
 
+@app.post("/api/sam/load")
+def sam_load():
+    """触发 SAM3 模型加载（后台线程，立即返回）。"""
+    import threading
+    from backend.segmentor import get_status, get_segmentor
+    if get_status() not in ("idle",):
+        return {"status": get_status()}
+    threading.Thread(target=get_segmentor, daemon=True).start()
+    return {"status": "loading"}
+
+
 @app.get("/api/dirs")
 def list_dirs(path: str = ""):
     """列出目录内容，用于前端文件浏览器。路径相对于项目根目录。"""
