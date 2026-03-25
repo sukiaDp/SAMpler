@@ -307,7 +307,8 @@ input:focus, textarea:focus, select:focus {
 
 #sam-status-card[data-status="ready"] .sam-card-bar { background: #30d158; }
 
-#sam-status-card[data-status="loading"] .sam-card-bar-fill {
+#sam-status-card[data-status="loading"] .sam-card-bar-fill,
+#sam-status-card[data-status="warming"] .sam-card-bar-fill {
   background: #0a84ff;
   animation: sam-sweep 1.1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

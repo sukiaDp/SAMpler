@@ -52,6 +52,7 @@ const SAM_STATUS_LABEL = {
   not_found: "未下载",
   idle:      "未加载",
   loading:   "加载中",
+  warming:   "预热中",
   ready:     "就绪",
   inferring: "推理中",
 };

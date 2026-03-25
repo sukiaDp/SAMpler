@@ -1,6 +1,9 @@
 """SAM3 lazy singleton — loaded once per process, reused across requests."""
 import threading
 import sys
+import tempfile
+import numpy as np
+import cv2
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -12,7 +15,7 @@ _lock = threading.Lock()
 _segmentor: SAM3Segmentor | None = None
 _segmentor_conf: float | None = None
 
-# State: "not_found" | "idle" | "loading" | "ready" | "inferring"
+# State: "not_found" | "idle" | "loading" | "warming" | "ready" | "inferring"
 _state: str = "not_found"
 
 MODEL_PATH = Path(__file__).parent.parent / "sam3.pt"
@@ -47,6 +50,17 @@ def get_segmentor(conf: float = 0.25) -> SAM3Segmentor:
                 model_path=str(MODEL_PATH), conf=conf, device="0", half=True
             )
             _segmentor_conf = conf
+            # Warmup: run a dummy predict on a black image so GPU/encoder is
+            # fully initialized before the first real request arrives
+            _state = "warming"
+            try:
+                dummy = np.zeros((64, 64, 3), dtype=np.uint8)
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                    cv2.imwrite(f.name, dummy)
+                    _segmentor.predict(f.name, "object", force_reload=True)
+                    Path(f.name).unlink(missing_ok=True)
+            except Exception:
+                pass  # warmup failure is non-fatal
             _state = "ready"
         elif conf != _segmentor_conf:
             _segmentor.predictor.args.conf = conf
